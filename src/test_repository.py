@@ -50,7 +50,9 @@ def _validate_graph(data: object) -> dict[str, tuple[str, ...]]:
     for name, links in nodes.items():
         for link in links:
             if link not in nodes:
-                raise ValueError(f"repository: {name} ссылается на {link} без записи")
+                raise ValueError(
+                    f"repository: {name} ссылается на {link} без записи"
+                )
     return nodes
 
 

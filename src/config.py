@@ -40,7 +40,7 @@ def load_config(path: Path) -> Config:
         parser.read_file(stream)
     values = _get_section(parser)
     test_mode = _read_bool(values, "test_mode")
-    return Config(
+    config = Config(
         package=_read_package(values["package"], test_mode),
         repository=_read_repository(values["repository"], test_mode, path),
         test_mode=test_mode,
@@ -50,6 +50,8 @@ def load_config(path: Path) -> Config:
         max_depth=_read_depth(values["max_depth"]),
         target_framework=_read_framework(values.get("target_framework", "")),
     )
+    _check_output_paths(config, path)
+    return config
 
 
 def _get_section(
@@ -118,10 +120,21 @@ def _read_output(raw: str, config_path: Path) -> Path:
     """Разрешить путь для SVG и отклонить каталог в качестве файла."""
     if Path(raw).suffix.lower() != ".svg":
         raise ValueError("output: ожидается имя файла с расширением .svg")
-    target = (config_path.parent / raw).absolute()
+    target = (config_path.parent / raw).resolve()
     if target.is_dir():
         raise ValueError(f"output: указан каталог: {target}")
     return target
+
+
+def _check_output_paths(config: Config, config_path: Path) -> None:
+    """Не позволить выходным файлам заменить входные."""
+    inputs = {config_path.resolve()}
+    if config.test_mode:
+        inputs.add(Path(config.repository).resolve())
+    if any(p.resolve() in inputs for p in (
+        config.output, config.output.with_suffix(".dot")
+    )):
+        raise ValueError("output: выходной файл совпадает с входным")
 
 
 def _read_depth(raw: str) -> int:

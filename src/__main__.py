@@ -11,6 +11,7 @@ from .model import Package
 from .nuget import NuGetRepository
 from .order import order_text
 from .test_repository import TestRepository
+from .visualize import ascii_tree, save_diagram
 
 Repository = NuGetRepository | TestRepository
 
@@ -38,6 +39,8 @@ def _parser() -> argparse.ArgumentParser:
                        help="вывести прямые зависимости из метаданных")
     modes.add_argument("--load-order", action="store_true",
                        help="вывести зависимости раньше потребителей")
+    modes.add_argument("--levels", action="store_true",
+                       help="вывести уровни BFS без создания файлов")
     return parser
 
 
@@ -52,7 +55,15 @@ def _execute(args: argparse.Namespace, config: Config) -> None:
         _print_direct(repository, package)
         return
     graph = build_graph(package, repository.children, config.max_depth)
-    print(order_text(graph) if args.load_order else levels_text(graph))
+    if args.load_order:
+        print(order_text(graph))
+    elif args.levels:
+        print(levels_text(graph))
+    else:
+        dot_file = save_diagram(graph, config.output)
+        print(f"DOT: {dot_file}\nSVG: {config.output}")
+        if config.ascii_tree:
+            print(ascii_tree(graph))
 
 
 def _repository(config: Config, package: Package) -> Repository:

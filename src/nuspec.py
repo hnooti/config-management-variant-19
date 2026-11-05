@@ -6,7 +6,9 @@ from .config import PACKAGE_ID
 from .model import Dependency
 
 
-def parse_nuspec(content: bytes, target_framework: str) -> tuple[Dependency, ...]:
+def parse_nuspec(
+    content: bytes, target_framework: str
+) -> tuple[Dependency, ...]:
     """Разобрать .nuspec с пространством имён или без него."""
     try:
         root = et.fromstring(content)

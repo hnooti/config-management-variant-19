@@ -39,6 +39,8 @@ def order_text(graph: Graph) -> str:
     order = load_order(graph)
     lines = ["Порядок загрузки (зависимости раньше потребителей):"]
     if graph.boundary():
-        lines.append("Граф ограничен глубиной; порядок только для видимых рёбер.")
+        lines.append(
+            "Граф ограничен глубиной; порядок только для видимых рёбер."
+        )
     lines.extend(f"{index}. {node}" for index, node in enumerate(order, 1))
     return "\n".join(lines)

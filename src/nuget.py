@@ -5,6 +5,7 @@ import ssl
 import sys
 from functools import lru_cache
 from pathlib import Path
+from time import sleep
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
@@ -13,7 +14,10 @@ from .model import Dependency, Package
 from .nuspec import parse_nuspec
 from .version import Version, parse_range, parse_version
 
-HTTP_TIMEOUT = 15
+HTTP_TIMEOUT = 12
+HTTP_ATTEMPTS = 3
+RETRY_DELAY = 0.3
+RETRY_STATUS = {408, 429, 500, 502, 503, 504}
 MAX_RESPONSE = 16 * 1024 * 1024
 NOT_FOUND = 404
 BASE_TYPE = "PackageBaseAddress/3.0.0"
@@ -115,14 +119,36 @@ def _tls_context() -> ssl.SSLContext:
 
 def _fetch(url: str) -> bytes:
     """Выполнить GET с проверкой TLS, таймаутом и лимитом размера."""
-    try:
-        with urlopen(url, timeout=HTTP_TIMEOUT, context=_tls_context()) as rsp:
-            data = rsp.read(MAX_RESPONSE + 1)
-    except HTTPError as error:
-        detail = "ресурс не найден" if error.code == NOT_FOUND else error.reason
-        raise ValueError(f"HTTP {error.code}: {detail}: {url}") from error
-    except (URLError, OSError) as error:
-        raise ValueError(f"не удалось получить {url}: {error}") from error
+    for attempt in range(1, HTTP_ATTEMPTS + 1):
+        try:
+            return _get(url)
+        except OSError as error:
+            if attempt == HTTP_ATTEMPTS or not _is_transient(error):
+                raise ValueError(_request_error(url, error)) from error
+            sleep(RETRY_DELAY * attempt)
+    raise AssertionError("HTTP_ATTEMPTS должен быть положительным")
+
+
+def _get(url: str) -> bytes:
+    """Прочитать один ограниченный по размеру HTTP-ответ."""
+    with urlopen(url, timeout=HTTP_TIMEOUT, context=_tls_context()) as rsp:
+        data = rsp.read(MAX_RESPONSE + 1)
     if len(data) > MAX_RESPONSE:
         raise ValueError(f"слишком большой ответ: {url}")
     return data
+
+
+def _is_transient(error: OSError) -> bool:
+    """Повторять временные ошибки сети, сохраняя проверку сертификатов."""
+    if isinstance(error, HTTPError):
+        return error.code in RETRY_STATUS
+    reason = error.reason if isinstance(error, URLError) else error
+    return not isinstance(reason, ssl.SSLCertVerificationError)
+
+
+def _request_error(url: str, error: OSError) -> str:
+    """Добавить URL и статус HTTP к диагностике запроса."""
+    if isinstance(error, HTTPError):
+        detail = "ресурс не найден" if error.code == NOT_FOUND else error.reason
+        return f"HTTP {error.code}: {detail}: {url}"
+    return f"не удалось получить {url}: {error}"
