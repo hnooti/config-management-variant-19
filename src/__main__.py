@@ -9,6 +9,7 @@ from .config import Config, config_text, load_config
 from .graph import build_graph, levels_text
 from .model import Package
 from .nuget import NuGetRepository
+from .order import order_text
 from .test_repository import TestRepository
 
 Repository = NuGetRepository | TestRepository
@@ -35,6 +36,8 @@ def _parser() -> argparse.ArgumentParser:
                        help="вывести параметры в формате ключ=значение")
     modes.add_argument("--direct", action="store_true",
                        help="вывести прямые зависимости из метаданных")
+    modes.add_argument("--load-order", action="store_true",
+                       help="вывести зависимости раньше потребителей")
     return parser
 
 
@@ -49,7 +52,7 @@ def _execute(args: argparse.Namespace, config: Config) -> None:
         _print_direct(repository, package)
         return
     graph = build_graph(package, repository.children, config.max_depth)
-    print(levels_text(graph))
+    print(order_text(graph) if args.load_order else levels_text(graph))
 
 
 def _repository(config: Config, package: Package) -> Repository:
