@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.idea/
+.vscode/
+.DS_Store
+/build/
+/dist/
+/out/
+*.svg
+*.dot
+*.pdf
+*.zip
